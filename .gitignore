@@ -2,3 +2,5 @@
 build/
 # Ignore CMake Package Manager
 cmake/
+# Ignore AudioFiles
+AudioFile/

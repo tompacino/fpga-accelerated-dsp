@@ -17,9 +17,10 @@ find_package(fixed_math REQUIRED)
 # Libs
 add_subdirectory(optrode)
 add_subdirectory(filters)
+add_subdirectory(AudioFile)
 
 add_executable(demo main.cpp)
-target_link_libraries(demo PUBLIC ${Boost_LIBRARIES} optrode filters)
+target_link_libraries(demo PUBLIC ${Boost_LIBRARIES} optrode filters AudioFile)
 
 add_executable(lmsDemo lmsDemo.cpp)
-target_link_libraries(lmsDemo PUBLIC ${Boost_LIBRARIES} filters)
+target_link_libraries(lmsDemo PUBLIC ${Boost_LIBRARIES} filters AudioFile)

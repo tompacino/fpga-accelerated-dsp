@@ -17,13 +17,16 @@ namespace LMS
         DT currentStepSize;
     };
 
-    template<typename DT, std::size_t Taps, DT InitialStepSize, DT Alpha, DT Gamma, bool OutputDebug>
+    template<typename DT, std::size_t Taps, bool OutputDebug>
     class VSS
     {
+        DT initialStepSize;
+        DT stepSize;
+        DT alpha;
+        DT gamma;
 
-        DT stepSize = InitialStepSize;
-        DT minStepSize = InitialStepSize / 10;
-        DT maxStepSize = InitialStepSize * 10;
+        DT minStepSize;
+        DT maxStepSize;
 
         std::size_t idxSample;
 
@@ -32,12 +35,14 @@ namespace LMS
         std::array<DT, Taps> h_hat;
 
     public:
-        VSS(DT tapValue)
+        VSS(DT initialStepSize, DT alpha, DT gamma) : initialStepSize(initialStepSize), stepSize(initialStepSize), alpha(alpha), gamma(gamma)
         {
-            resetTaps(tapValue);
+            minStepSize = stepSize / 100;
+            maxStepSize = stepSize * 100;
+            resetTaps(0);
+            resetHistory();
         };
 
-        template <bool OutputDebug>
         DT step(DT xNext, DT dNext)
         {
 
@@ -62,22 +67,22 @@ namespace LMS
             {
                 DT estimator = stepSize * errorSignal * x_hat(idx);
                 estimator /= power;
-                h_hat(idx) = h_hat(idx) + tapAdjustment;
+                h_hat(idx) = h_hat(idx) + estimator;
                 x_hat(idx) = x_hat(idx - 1);
                 d_hat(idx) = d_hat(idx - 1);
             }
             DT estimator = stepSize * errorSignal * x_hat(0);
             estimator /= power;
-            h_hat(0) = h_hat(0) + tapAdjustment;
+            h_hat(0) = h_hat(0) + estimator;
             x_hat(0) = xNext;
             d_hat(0) = dNext;
 
             // Update step size
             stepSize = alpha * stepSize + gamma * errorSignal;
 
-            if (constexpr OutputDebug)
+            if (OutputDebug)
             {
-                return Debug(errorSignal, stepSize);
+                return Debug<DT>(errorSignal, stepSize);
             }
             else
             {
@@ -87,7 +92,7 @@ namespace LMS
 
         void resetStepSize()
         {
-            stepSize = InitialStepSize;
+            stepSize = initialStepSize;
         };
 
         void resetTaps(DT tapValue)
@@ -95,9 +100,10 @@ namespace LMS
             h_hat.fill(tapValue);
         };
 
-        void clearHistory()
+        void resetHistory()
         {
             x_hat.fill(0);
+            d_hat.fill(0);
         }
     };
 }
