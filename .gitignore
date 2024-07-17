@@ -1,5 +1,7 @@
 # Ignore build folder
 build/
+build_debug/
+build_release/
 # Ignore CMake Package Manager
 cmake/
 # Ignore AudioFiles
