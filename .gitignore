@@ -4,3 +4,5 @@ build/
 cmake/
 # Ignore AudioFiles
 AudioFile/
+# Ignore Temporary Files
+temp/
