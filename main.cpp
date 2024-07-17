@@ -3,14 +3,11 @@
 #include <optional>
 #include <csignal>
 
-#include "board.h"
-#include "datawriter.h"
-#include "ui.h"
-
 #include <boost/log/trivial.hpp>
-#include "../lib_optrode/misc.h"
-#include "../lib_optrode/axi_dma.h"
-#include "../lib_optrode/SerialPort.hpp"
+
+#include "optrode/board.h"
+#include "optrode/datawriter.h"
+#include "optrode/ui.h"
 
 #define STATISTIC_INTERVAL 1024
 

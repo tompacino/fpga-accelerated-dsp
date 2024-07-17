@@ -3,16 +3,23 @@ project(Optrode)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(dir "optrode")
-set(lib_dir "lib_optrode")
+# Require Cmake Package Manager
+include(cmake/CPM.cmake)
 
-# BOOST
-find_package(Boost 1.65.1 REQUIRED COMPONENTS log log_setup thread filesystem system regex)
-if(Boost_FOUND)
-    include_directories(${Boost_INCLUDE_DIRS})
+# Fixed point
+CPMAddPackage(
+  NAME fixed_math
+  GITHUB_REPOSITORY arturbac/fixed_math
+  GIT_TAG        v1.0.0
+)
+find_package(fixed_math REQUIRED)
 
-    add_executable(demo ${dir}/main.cpp ${lib_dir}/SerialPort.cpp ${lib_dir}/axi_dma.c)
-    target_link_libraries(demo ${Boost_LIBRARIES})
-else()
-    message(FATAL_ERROR "Boost not found")
-endif()
+# Libs
+add_subdirectory(optrode)
+add_subdirectory(filters)
+
+add_executable(demo main.cpp)
+target_link_libraries(demo PUBLIC ${Boost_LIBRARIES} optrode filters)
+
+add_executable(lmsDemo lmsDemo.cpp)
+target_link_libraries(lmsDemo PUBLIC ${Boost_LIBRARIES} filters)
