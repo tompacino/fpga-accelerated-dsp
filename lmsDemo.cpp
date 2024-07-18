@@ -96,7 +96,8 @@ int main()
         optFlt = static_cast<float>(opt24);
         auto ref16 = T_VNLMS{refFlt};
         auto opt16 = T_VNLMS{optFlt};
-        auto [err16, css16] = myFilter.step(opt16, ref16);
+        auto err16 = myFilter.step(opt16, ref16);
+        auto css16 = myFilter.getStepSize();
         auto anc16 = opt16 - err16;
 
         // Convert back to float to store in WAV

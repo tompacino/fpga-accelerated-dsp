@@ -3,52 +3,43 @@
 #include <array>
 #include <algorithm>
 
-// TODO:
-/*
-    - Loop unrolling
-    - Custom bounds for step size
-*/
-
 namespace LMS
 {
-
-    template<typename T>
-    struct Output
-    {
-        T err;
-        T currentStepSize;
-    };
-
     template<typename T, std::size_t Taps, bool Normalised>
-    class VSS
+    class FSS
     {
-
+    protected:
         T stepSize;
-        T alpha;
-        T gamma;
-
         T epsilon;
-
-        T minStep;
-        T maxStep;
-
-        T curStep;
+        T err;
 
         std::array<T, Taps> x_hat;
         std::array<T, Taps> h_hat;
 
-        T err;
-
     public:
-        VSS(T stepSize, T alpha, T gamma) : VSS(stepSize, alpha, gamma, stepSize / 100, stepSize / 100, stepSize * 100){};
 
-        VSS(T stepSize, T alpha, T gamma, T epsilon, T minStep, T maxStep) :
-            stepSize(stepSize), alpha(alpha), gamma(gamma), epsilon(epsilon), minStep(minStep), maxStep(maxStep), curStep(stepSize) {
+        FSS(T stepSize) : FSS(stepSize, stepSize / 100){};
+
+        FSS(T stepSize, T epsilon) : stepSize(stepSize), epsilon(epsilon)
+        {
             x_hat.fill(0);
             h_hat.fill(0);
         }
 
-        LMS::Output<T> step(T xNxt, T dNxt)
+        virtual T step(T xNxt, T dNxt)
+        {
+            T pow = computeNext(xNxt, dNxt);
+            updateFilter(pow);
+            return err;
+        };
+
+        T last()
+        {
+            return err;
+        }
+
+    protected:
+        T computeNext(T xNxt, T dNxt)
         {
             // Compute next sample estimate, error, and power
             T est = 0;
@@ -63,9 +54,13 @@ namespace LMS
             est += h_hat[0] * x_hat[0];
             pow += x_hat[0] * x_hat[0];
             err = dNxt - est;
+            return pow;
+        }
 
+        void updateFilter(T pow)
+        {
             // Update filter taps based on error
-            T estimator = curStep * err;
+            T estimator = stepSize * err;
             for (std::size_t idx = 0; idx < Taps; idx++)
             {
                 T tapDelta = estimator * x_hat[idx];
@@ -73,21 +68,10 @@ namespace LMS
                     tapDelta = normalise(tapDelta, pow);
                 h_hat[idx] += tapDelta;
             }
-
-            // Update step size
-            curStep = alpha * curStep + gamma * err * x_hat[0];
-            curStep = std::max(curStep, minStep);
-            curStep = std::min(curStep, maxStep);
-
-            return Output<T>{err, curStep};
-        };
-
-        LMS::Output<T> last()
-        {
-            return Output<T>{err, curStep};
         }
 
-        T normalise(T tapDelta, T pow) {
+        T normalise(T tapDelta, T pow)
+        {
             if (pow == 0)
             {
                 return tapDelta;
@@ -103,10 +87,53 @@ namespace LMS
 
             return tapDelta;
         };
+    };
 
-        void resetStepSize()
+    template<typename T, std::size_t Taps, bool Normalised>
+    class VSS : public FSS<T, Taps, Normalised>
+    {
+    protected:
+        using FSS<T, Taps, Normalised>::stepSize;
+        using FSS<T, Taps, Normalised>::err;
+        using FSS<T, Taps, Normalised>::x_hat;
+
+        T alpha;
+        T gamma;
+
+        T minStep;
+        T maxStep;
+
+        T intStep;
+
+    public:
+        VSS(T stepSize, T alpha, T gamma) :
+            VSS(stepSize, alpha, gamma, stepSize / 100, stepSize / 100, stepSize * 100){};
+
+        VSS(T stepSize, T alpha, T gamma, T epsilon, T minStep, T maxStep) :
+            FSS<T, Taps, Normalised>(stepSize, epsilon), alpha(alpha), gamma(gamma), minStep(minStep), maxStep(maxStep), intStep(stepSize){};
+
+        T step(T xNxt, T dNxt)
         {
-            curStep = stepSize;
+            T pow = this->computeNext(xNxt, dNxt);
+            this->updateFilter(pow);
+
+            // Update step size
+            stepSize = alpha * stepSize + gamma * err * xNxt;
+            stepSize = std::max(stepSize, minStep);
+            stepSize = std::min(stepSize, maxStep);
+
+            return err;
+        };
+
+        T getStepSize()
+        {
+            return stepSize;
+        }
+
+        T resetStepSize()
+        {
+            stepSize = intStep;
+            return stepSize;
         };
 
     };
