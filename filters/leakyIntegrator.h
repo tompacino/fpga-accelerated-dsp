@@ -3,15 +3,15 @@
 template<typename T>
 class LeakyIntegrator
 {
-    T lastSample;
     T alpha;
-    T initialValue;
+    T minusAlpha;
+    T lastSample;
 public:
-    LeakyIntegrator(T alpha, T initialValue) : lastSample(0), alpha(alpha), initialValue(initialValue){};
+    LeakyIntegrator(T alpha, T minusAlpha, T initialValue) : alpha(alpha), minusAlpha(minusAlpha), lastSample(initialValue) {};
 
     T step(T sample)
     {
-        lastSample = alpha * lastSample + (1 - alpha) * sample;
+        lastSample = alpha * lastSample + minusAlpha * sample;
         return lastSample;
     }
 };

@@ -6,5 +6,7 @@ build_release/
 cmake/
 # Ignore AudioFiles
 AudioFile/
+# Ignore CNL
+cnl/
 # Ignore Temporary Files
 temp/
