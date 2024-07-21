@@ -1,9 +1,14 @@
 #include <iostream>
+#include <numeric>
 
 #include "cnl/include/cnl/all.h"
+#include "AudioFile/AudioFile.h"
+
+// compile time math
+#include "gcem.hpp"
+
 #include "filters/lms/lms.h"
 #include "filters/leakyIntegrator.h"
-#include "AudioFile/AudioFile.h"
 
 using cnl::power;
 using cnl::saturated_overflow_tag;
@@ -11,35 +16,75 @@ using cnl::scaled_integer;
 using cnl::static_integer;
 using cnl::neg_inf_rounding_tag;
 
+using T_VNLMS = float;
+using T_LEAKY = float;
+
 // using T_VNLMS = scaled_integer<int16_t, power<-14>>;
 // using T_LEAKY = scaled_integer<int32_t, power<-30>>;
 
 // using T_VNLMS = static_integer<16, neg_inf_rounding_tag, saturated_overflow_tag, int16_t>;
 // using T_LEAKY = static_integer<24, neg_inf_rounding_tag, saturated_overflow_tag, int32_t>;
 
-using T_VNLMS = float;
-using T_LEAKY = float;
-
 int main()
 {
-    // Account for missing bit depth
-    float myScalingFactor = 1.0F;
+    // Reference channel lookahead?
+    constexpr std::size_t filterTaps = 1U;
+    constexpr std::size_t lookahead = (filterTaps == 1U) ? 0U : filterTaps / 2;
 
-    auto initialStepSize = T_VNLMS{0.000001F};
-    auto alpha = T_VNLMS{0.5F};
-    auto gamma = T_VNLMS{0.5F};
+    // Account for external gain control on LRB (normalise close to (1, -1)
+    constexpr float myScalingFactor = 1.0F;
 
-    auto alphaLeaky = T_LEAKY{0.99F};
-    auto minusalphaLeaky = T_LEAKY{0.01F};
-    auto initLeaky = T_LEAKY{0.0F};
+    // Leaky integrators
+    constexpr float alphaLeakyF = 0.999F;
+    constexpr float minusalphaLeakyF = 0.001F;
+    constexpr float initLeakyF = 0.0F;
+
+    constexpr auto alphaLeaky = T_LEAKY{alphaLeakyF};
+    constexpr auto minusalphaLeaky = T_LEAKY{minusalphaLeakyF};
+    constexpr auto initLeaky = T_LEAKY{initLeakyF};
+
+    // Fixed point converion values
+    constexpr auto alphaLeakyFF = float{alphaLeaky};
+    constexpr auto minusalphaLeakyFF = float{minusalphaLeaky};
+    constexpr auto initLeakyFF = float{initLeaky};
 
     LeakyIntegrator leakyRef = LeakyIntegrator<T_LEAKY>(alphaLeaky, minusalphaLeaky, initLeaky);
     LeakyIntegrator leakyOpt = LeakyIntegrator<T_LEAKY>(alphaLeaky, minusalphaLeaky, initLeaky);
 
-    LMS::VSS myFilter = LMS::VSS<T_VNLMS, 1U, true>(initialStepSize, alpha, gamma);
+    std::cout << "leaky integrator\n" << leakyRef << "\n";
+
+    // VSS NLMS
+    constexpr float initialStepSizeF = 0.001F;
+    constexpr float epsilonF = static_cast<float>(std::numeric_limits<T_VNLMS>::min());
+    constexpr float minStepSizeF = initialStepSizeF / 100.0F;
+    constexpr float maxStepSizeF = initialStepSizeF * 100.0F;
+    constexpr float alphaF = 0.99F;
+    constexpr float gammaF = 0.01F;
+
+    constexpr auto initialStepSize = T_VNLMS{initialStepSizeF};
+    constexpr auto epsilon = T_VNLMS{epsilonF};
+    constexpr auto minStepSize = T_VNLMS{minStepSizeF};
+    constexpr auto maxStepSize = T_VNLMS{maxStepSizeF};
+    constexpr auto alpha = T_VNLMS{alphaF};
+    constexpr auto gamma = T_VNLMS{gammaF};
+
+    constexpr auto initialStepSizeFF = float{initialStepSize};
+    constexpr auto epsilonFF = float{epsilon};
+    constexpr auto minStepSizeFF = float{minStepSize};
+    constexpr auto maxStepSizeFF = float{maxStepSize};
+    constexpr auto alphaFF = float{alpha};
+    constexpr auto gammaFF = float{gamma};
+
+    LMS::VSS myFilter = LMS::VSS<T_VNLMS, filterTaps, true>(initialStepSize, alpha, gamma, epsilon, minStepSize, maxStepSize);
+
+    std::cout << "lms filter\n" << myFilter << "\n";
 
     AudioFile<float> ref;
     AudioFile<float> opt;
+
+    AudioFile<float> refL;
+    AudioFile<float> optL;
+
     AudioFile<float> err;
     AudioFile<float> stp;
     AudioFile<float> anc;
@@ -65,47 +110,61 @@ int main()
     // ref.load("temp/ADC_CONCAT_1.wav");
     // opt.load("temp/ADC_CONCAT_2.wav");
 
+    refL.load("temp/refL.wav");
+    optL.load("temp/optL.wav");
+
     err.load("temp/err.wav");
     stp.load("temp/stp.wav");
     anc.load("temp/anc.wav");
 
     ref.printSummary();
-    opt.printSummary();
-    err.printSummary();
-    stp.printSummary();
-    anc.printSummary();
 
     int channel = 0;
     int numSamples = ref.getNumSamplesPerChannel();
 
-    for (int i = 0; i < numSamples; i++)
+    for (std::size_t idxOpt = 0; idxOpt < (numSamples - lookahead); idxOpt++)
     {
-        auto refFlt = ref.samples[channel][i] * myScalingFactor;
-        auto optFlt = opt.samples[channel][i] * myScalingFactor;
+        std::size_t idxRef = idxOpt + lookahead;
+
+        auto refFlt = ref.samples[channel][idxRef] * myScalingFactor;
+        auto optFlt = opt.samples[channel][idxOpt] * myScalingFactor;
 
         // Convert to fixed point (32 fraction bits (s1:31))
-        auto ref24 = T_LEAKY{refFlt};
-        auto opt24 = T_LEAKY{optFlt};
-        auto ref24new = leakyRef.step(ref24);
-        auto opt24new = leakyOpt.step(opt24);
+        T_LEAKY ref24 = static_cast<T_LEAKY>(refFlt);
+        T_LEAKY opt24 = static_cast<T_LEAKY>(optFlt);
+        T_LEAKY ref24new = leakyRef.step(ref24);
+        T_LEAKY opt24new = leakyOpt.step(opt24);
+
+        refL.samples[channel][idxRef] = float{ref24new} / myScalingFactor;
+        optL.samples[channel][idxOpt] = float{opt24new} / myScalingFactor;
+
+        // Subtract average
         ref24 = ref24 - ref24new;
         opt24 = opt24 - opt24new;
+        // Skip integration
+        // ref24 = ref24;
+        // opt24 = opt24;
 
         // Convert to 16 bit fixed point for VLMS filter. Adjust scale factor
-        refFlt = static_cast<float>(ref24);
-        optFlt = static_cast<float>(opt24);
-        auto ref16 = T_VNLMS{refFlt};
-        auto opt16 = T_VNLMS{optFlt};
-        auto err16 = myFilter.step(opt16, ref16);
-        auto css16 = myFilter.getStepSize();
-        auto anc16 = opt16 - err16;
+        ref24 = ref24 * myScalingFactor;
+        opt24 = opt24 * myScalingFactor;
+        refFlt = float{ref24};
+        optFlt = float{opt24};
+        T_VNLMS ref16 = static_cast<T_VNLMS>(refFlt);
+        T_VNLMS opt16 = static_cast<T_VNLMS>(optFlt);
+        T_VNLMS err16 = myFilter.step(opt16, ref16);
+        T_VNLMS css16 = myFilter.getStepSize();
+        T_VNLMS anc16 = opt16 - err16;
 
         // Convert back to float to store in WAV
-        anc.samples[channel][i] = float{anc16} / myScalingFactor;
-        err.samples[channel][i] = float{err16} / myScalingFactor;
-        stp.samples[channel][i] = float{css16} / myScalingFactor;
+        anc.samples[channel][idxOpt] = float{anc16} / myScalingFactor;
+        err.samples[channel][idxOpt] = float{err16} / myScalingFactor;
+        stp.samples[channel][idxOpt] = float{css16} / myScalingFactor;
 
     }
+
+    refL.save("temp/refL.wav");
+    optL.save("temp/optL.wav");
 
     err.save("temp/err.wav");
     stp.save("temp/stp.wav");

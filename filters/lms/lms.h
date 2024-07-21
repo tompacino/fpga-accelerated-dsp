@@ -2,6 +2,7 @@
 
 #include <array>
 #include <algorithm>
+#include <ranges>
 
 namespace LMS
 {
@@ -17,7 +18,6 @@ namespace LMS
         std::array<T, Taps> h_hat;
 
     public:
-
         FSS(T stepSize) : FSS(stepSize, stepSize / 100){};
 
         FSS(T stepSize, T epsilon) : stepSize(stepSize), epsilon(epsilon)
@@ -33,15 +33,40 @@ namespace LMS
             return err;
         };
 
-        T last()
+        T last() const
         {
             return err;
         }
 
+        T getStepSize() const
+        {
+            return stepSize;
+        }
+
+        void serialiseX_hat(std::ostream &os) const
+        {
+            os << "x_hat: [";
+            std::ranges::for_each(x_hat, [&](const auto &tap)
+                                { os << tap << ", "; });
+            os << " ]";
+        }
+
+        void serialiseH_hat(std::ostream &os) const
+        {
+            os << "h_hat: [";
+            std::ranges::for_each(h_hat, [&](const auto &tap)
+                                { os << tap << ", "; });
+            os << "]";
+        }
+
+        template<typename TT, std::size_t TTaps, bool TNormalised>
+        friend std::ostream& operator<<(std::ostream &os, const FSS<TT, TTaps, TNormalised> &fss);
+
     protected:
+        // Compute next sample estimate, error, and return power
         T computeNext(T xNxt, T dNxt)
         {
-            // Compute next sample estimate, error, and power
+
             T est = 0;
             T pow = epsilon; // To avoid divide by zero
             for (std::size_t idx = (Taps - 1); idx > 0; idx--)
@@ -64,7 +89,7 @@ namespace LMS
             for (std::size_t idx = 0; idx < Taps; idx++)
             {
                 T tapDelta = estimator * x_hat[idx];
-                if (Normalised)
+                if constexpr (Normalised)
                     tapDelta = normalise(tapDelta, pow);
                 h_hat[idx] += tapDelta;
             }
@@ -118,17 +143,14 @@ namespace LMS
             this->updateFilter(pow);
 
             // Update step size
-            stepSize = alpha * stepSize + gamma * err * xNxt;
+            T alphaStepSize = alpha * stepSize;
+            T gammaStepSize = gamma * err * xNxt;
+            stepSize = alphaStepSize + gammaStepSize;
             stepSize = std::max(stepSize, minStep);
             stepSize = std::min(stepSize, maxStep);
 
             return err;
         };
-
-        T getStepSize()
-        {
-            return stepSize;
-        }
 
         T resetStepSize()
         {
@@ -136,5 +158,28 @@ namespace LMS
             return stepSize;
         };
 
+        template<typename TT, std::size_t TTaps, bool TNormalised>
+        friend std::ostream& operator<<(std::ostream &os, const VSS<TT, TTaps, TNormalised> &vss);
+
+    };
+
+    template<typename T, std::size_t Taps, bool Normalised>
+    std::ostream& operator<<(std::ostream &os, const FSS<T, Taps, Normalised> &fss)
+    {
+        os << "stepSize :\t" << fss.stepSize << "\n";
+        os << "epsilon  :\t" << fss.epsilon << "\n";
+        os << "err      :\t" << fss.err;
+        return os;
+    };
+
+    template<typename T, std::size_t Taps, bool Normalised>
+    std::ostream& operator<<(std::ostream &os, const VSS<T, Taps, Normalised> &vss)
+    {
+        os << static_cast<const FSS<T, Taps, Normalised>&>(vss) << "\n";
+        os << "alpha  :\t" << vss.alpha << "\n";
+        os << "gamma  :\t" << vss.gamma << "\n";
+        os << "minstep:\t" << vss.minStep << "\n";
+        os << "maxStep:\t" << vss.maxStep;
+        return os;
     };
 }
