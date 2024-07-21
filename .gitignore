@@ -1,8 +1,5 @@
 # Ignore build folder
-build/
-build_debug/
-build_release/
-build_cortex_a9/
+build*/
 # Ignore CMake Package Manager
 cmake/
 # Ignore AudioFiles
