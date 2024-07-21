@@ -13,6 +13,7 @@ namespace LMS
         T stepSize;
         T epsilon;
         T err;
+        T pow; // may accumulate error?
 
         std::array<T, Taps> x_hat;
         std::array<T, Taps> h_hat;
@@ -20,7 +21,7 @@ namespace LMS
     public:
         FSS(T stepSize) : FSS(stepSize, stepSize / 100){};
 
-        FSS(T stepSize, T epsilon) : stepSize(stepSize), epsilon(epsilon)
+        FSS(T stepSize, T epsilon) : stepSize(stepSize), epsilon(epsilon), pow(epsilon)
         {
             x_hat.fill(0);
             h_hat.fill(0);
@@ -28,8 +29,8 @@ namespace LMS
 
         virtual T step(T xNxt, T dNxt)
         {
-            T pow = computeNext(xNxt, dNxt);
-            updateFilter(pow);
+            computeNext(xNxt, dNxt);
+            updateFilter();
             return err;
         };
 
@@ -64,25 +65,26 @@ namespace LMS
 
     protected:
         // Compute next sample estimate, error, and return power
-        T computeNext(T xNxt, T dNxt)
+        void computeNext(T xNxt, T dNxt)
         {
 
             T est = 0;
-            T pow = epsilon; // To avoid divide by zero
+            if constexpr (Taps > 1)
+                pow -= x_hat[Taps - 1] * x_hat[Taps - 1];
+
             for (std::size_t idx = (Taps - 1); idx > 0; idx--)
             {
                 x_hat[idx] = x_hat[idx - 1];
                 est += h_hat[idx] * x_hat[idx];
-                pow += x_hat[idx] * x_hat[idx];
             }
             x_hat[0] = xNxt;
             est += h_hat[0] * x_hat[0];
+
             pow += x_hat[0] * x_hat[0];
             err = dNxt - est;
-            return pow;
         }
 
-        void updateFilter(T pow)
+        void updateFilter()
         {
             // Update filter taps based on error
             T estimator = stepSize * err;
@@ -90,12 +92,12 @@ namespace LMS
             {
                 T tapDelta = estimator * x_hat[idx];
                 if constexpr (Normalised)
-                    tapDelta = normalise(tapDelta, pow);
+                    tapDelta = normalise(tapDelta);
                 h_hat[idx] += tapDelta;
             }
         }
 
-        T normalise(T tapDelta, T pow)
+        T normalise(T tapDelta)
         {
             if (pow == 0)
             {
@@ -139,8 +141,8 @@ namespace LMS
 
         T step(T xNxt, T dNxt)
         {
-            T pow = this->computeNext(xNxt, dNxt);
-            this->updateFilter(pow);
+            this->computeNext(xNxt, dNxt);
+            this->updateFilter();
 
             // Update step size
             T alphaStepSize = alpha * stepSize;

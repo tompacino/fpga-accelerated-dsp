@@ -1,10 +1,9 @@
 #include <iostream>
 #include <numeric>
 
-#include "cnl/include/cnl/all.h"
 #include "AudioFile/AudioFile.h"
-
-// compile time math
+#include "cnl/include/cnl/all.h"
+#include <gsl/gsl_statistics.h>
 #include "gcem.hpp"
 
 #include "filters/lms/lms.h"
@@ -54,12 +53,12 @@ int main()
     std::cout << "leaky integrator\n" << leakyRef << "\n";
 
     // VSS NLMS
-    constexpr float initialStepSizeF = 0.001F;
+    constexpr float initialStepSizeF = 0.0005F;
     constexpr float epsilonF = static_cast<float>(std::numeric_limits<T_VNLMS>::min());
     constexpr float minStepSizeF = initialStepSizeF / 100.0F;
     constexpr float maxStepSizeF = initialStepSizeF * 100.0F;
-    constexpr float alphaF = 0.99F;
-    constexpr float gammaF = 0.01F;
+    constexpr float alphaF = 0.9F;
+    constexpr float gammaF = 0.1F;
 
     constexpr auto initialStepSize = T_VNLMS{initialStepSizeF};
     constexpr auto epsilon = T_VNLMS{epsilonF};
@@ -120,14 +119,21 @@ int main()
     ref.printSummary();
 
     int channel = 0;
-    int numSamples = ref.getNumSamplesPerChannel();
+    int numSamples = ref.getNumSamplesPerChannel() - lookahead;
 
-    for (std::size_t idxOpt = 0; idxOpt < (numSamples - lookahead); idxOpt++)
+    double* optCor = new double[numSamples];
+    double* refCor = new double[numSamples];
+    double* ancCor = new double[numSamples];
+
+    for (std::size_t idxOpt = 0; idxOpt < numSamples; idxOpt++)
     {
         std::size_t idxRef = idxOpt + lookahead;
 
         auto refFlt = ref.samples[channel][idxRef] * myScalingFactor;
         auto optFlt = opt.samples[channel][idxOpt] * myScalingFactor;
+
+        refCor[idxRef] = static_cast<double>(refFlt);
+        optCor[idxOpt] = static_cast<double>(optFlt);
 
         // Convert to fixed point (32 fraction bits (s1:31))
         T_LEAKY ref24 = static_cast<T_LEAKY>(refFlt);
@@ -161,6 +167,7 @@ int main()
         err.samples[channel][idxOpt] = float{err16} / myScalingFactor;
         stp.samples[channel][idxOpt] = float{css16} / myScalingFactor;
 
+        ancCor[idxOpt] = static_cast<double>(float{anc16});
     }
 
     refL.save("temp/refL.wav");
@@ -169,6 +176,16 @@ int main()
     err.save("temp/err.wav");
     stp.save("temp/stp.wav");
     anc.save("temp/anc.wav");
+
+    std::cout << "Pearson correlation OPT & ANC:\n" << gsl_stats_correlation(optCor, 1, ancCor, 1, numSamples) << "\n";
+
+    std::cout << "Pearson correlation REF & ANC:\n" << gsl_stats_correlation(refCor, 1, ancCor, 1, numSamples) << "\n";
+
+    std::cout << "Pearson correlation OPT & REF:\n" << gsl_stats_correlation(optCor, 1, refCor, 1, numSamples) << "\n";
+
+    delete [] optCor;
+    delete [] refCor;
+    delete [] ancCor;
 
     return 0;
 }
