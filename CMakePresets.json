@@ -2,58 +2,37 @@
     "version": 3,
     "configurePresets": [
         {
-            "name": "debug",
-            "displayName": "Debug",
-            "binaryDir": "${sourceDir}/build_debug",
+            "name": "dev_debug",
+            "displayName": "Build dev_debug",
+            "binaryDir": "${sourceDir}/build_dev_debug",
             "generator": "Unix Makefiles",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_CXX_FLAGS_INIT": "-Wall -Wextra -g"
+                "CMAKE_CXX_FLAGS_INIT": "-W-Wall -Wextra -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wpointer-arith -Wdangling-else -Wrestrict -Wdouble-promotion -Wvla -Wswitch-enum -Wswitch-defaul -Winvalid-pch -Wodr -Wstack-usage=1024 -Wpedantic -g"
             }
         },
         {
-            "name": "release",
-            "displayName": "Release",
-            "binaryDir": "${sourceDir}/build_release",
+            "name": "zynq_debug",
+            "displayName": "Build zynq_debug",
+            "binaryDir": "${sourceDir}/build_zynq_debug",
             "generator": "Unix Makefiles",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_CXX_FLAGS_INIT": "-Wall -Wextra -Wpedantic -O3"
-            }
-        },
-        {
-            "name": "cortex_a9",
-            "displayName": "Arm Cortex A9",
-            "binaryDir": "${sourceDir}/build_cortex_a9",
-            "generator": "Unix Makefiles",
-            "cacheVariables": {
-                "CMAKE_SYSTEM_PROCESSOR": "arm",
-                "CMAKE_CXX_COMPILER": "/home/tpapacino/proj/fpga/armxpiler_install_lnx/gcc-arm-10.3-2021.07-x86_64-arm-none-eabi/bin/arm-none-eabi-g++",
-                "CMAKE_C_COMPILER": "/home/tpapacino/proj/fpga/armxpiler_install_lnx/gcc-arm-10.3-2021.07-x86_64-arm-none-eabi/bin/arm-none-eabi-gcc",
-                "CMAKE_LINKER": "/home/tpapacino/proj/fpga/armxpiler_install_lnx/gcc-arm-10.3-2021.07-x86_64-arm-none-eabi/bin/arm-none-eabi-ld",
-                "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_CXX_FLAGS_INIT": "-Wall -Wextra -Wpedantic -O3 -mcpu=cortex-a9",
-                "CMAKE_C_FLAGS_INIT": "-Wall -Wextra -Wpedantic -O3 -mcpu=cortex-a9",
-                "sysrootPrefix": "cortexa9t2hf-neon-xilinx-linux-gnueabi"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_FLAGS_INIT": "-Wall -Wextra -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wpointer-arith -Wdangling-else -Wrestrict -Wdouble-promotion -Wvla -Wswitch-enum -Wswitch-defaul -Winvalid-pch -Wodr -Wstack-usage=1024 -Wpedantic -fkeep-inline-functions -Og"
             }
         }
     ],
     "buildPresets": [
     {
-        "name": "debug",
-        "displayName": "Build Debug",
-        "configurePreset": "debug"
+        "name": "dev_debug",
+        "displayName": "Build dev_debug",
+        "configurePreset": "dev_debug"
     },
     {
-        "name": "release",
-        "displayName": "Build Release",
-        "configurePreset": "release"
-    },
-    {
-        "name": "zybo",
-        "displayName": "Build For Zynq Z70X0 Arm Cortex A9",
-        "configurePreset": "cortex_a9"
+        "name": "zynq_debug",
+        "displayName": "Build zynq_debug",
+        "configurePreset": "zynq_debug"
     }
   ]
 }

@@ -1,12 +1,7 @@
 #pragma once
 
 #include <optional>
-
-#include <boost/log/trivial.hpp>
-
 #include "SerialPort.hpp"
-
-#define DEVICE "/dev/ttyACM0"
 
 namespace mn::CppLinuxSerial
 {
@@ -15,5 +10,3 @@ namespace mn::CppLinuxSerial
         std::optional<SerialPort> start();
     }
 }
-
-

@@ -1,23 +1,19 @@
 #pragma once
 
+#include "AxiStreamDma.h"
+
 namespace LRB
 {
-    enum class Status
-    {
-        STOPPED,
-        ACTIVE
-    };
-
     class Board
     {
-
     public:
-        Board() {};
-        ~Board() {};
+        AxiStreamDma dma;
 
-        Status getStatus();
+        Board(AxiStreamDmaAddresses addresses);
+        void logDebugInformation();
 
+    private:
+        void init();
+        void programLogic();
     };
 }
-
-

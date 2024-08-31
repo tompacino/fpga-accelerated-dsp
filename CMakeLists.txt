@@ -1,53 +1,114 @@
 cmake_minimum_required(VERSION 3.1...3.28)
+set(CMAKE_CXX_STANDARD 20)
 project(Optrode)
 
-set(CMAKE_CXX_STANDARD 17)
+# Boost Library
+find_package(Boost 1.65.1 REQUIRED COMPONENTS log log_setup thread filesystem system regex)
+if(NOT Boost_FOUND)
+  message(FATAL_ERROR "Boost not found")
+endif()
+include_directories(${Boost_INCLUDE_DIRS})
 
-# Require Cmake Package Manager
+# The project requires CMake Package Manager, which is used to fetch the following required packages:
+#     Fixed Point Math Library
+#     Compile Time Math
+#     GNU Scientific Library
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/cmake/CPM.cmake")
+   message(STATUS "CPM.cmake not found, downloading...")
+   file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/cmake")
+   file(DOWNLOAD
+           "https://github.com/cpm-cmake/CPM.cmake/releases/latest/download/get_cpm.cmake"
+           "${CMAKE_SOURCE_DIR}/cmake/CPM.cmake"
+   )
+endif()
 include(cmake/CPM.cmake)
 
-# Fixed point
+# Cache for CPM
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/.cpmcache")
+   file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/.cpmcache")
+endif()
+set(CPM_SOURCE_CACHE "${CMAKE_SOURCE_DIR}/.cpmcache")
+
+message(STATUS "CPM fetching required packages...")
+CPMAddPackage(
+        NAME cnl
+        GITHUB_REPOSITORY johnmcfarlane/cnl
+        GIT_TAG        v1.1.2
+)
 CPMAddPackage(
   NAME fixed_math
   GITHUB_REPOSITORY arturbac/fixed_math
   GIT_TAG        v1.0.0
 )
-find_package(fixed_math REQUIRED)
-
-# Compile Time Math
 CPMAddPackage(
   NAME gcem
   GITHUB_REPOSITORY kthohr/gcem
   GIT_TAG        v1.18.0
 )
-find_package(gcem REQUIRED)
-
-# GNU Scientific Library
 CPMAddPackage(
   NAME gsl
   GITHUB_REPOSITORY ampl/gsl
   GIT_TAG        20211111
   OPTIONS "BUILDLIBS statistics" "NO_AMPL_BINDINGS on" "GSL_DISABLE_TESTS on" "DOCUMENTATION off"
 )
-find_package(gcem REQUIRED)
+# CPMAddPackage(
+#   NAME axidma_api
+#   GITHUB_REPOSITORY tompacino/axi-dma
+#   GIT_TAG        master
+# )
 
-# Libs
+message(STATUS "CPM adding required packages...")
+find_package(cnl REQUIRED)
+find_package(fixed_math REQUIRED)
+find_package(gcem REQUIRED)
+find_package(gsl REQUIRED)
+# find_package(axidma_api REQUIRED)
+
+# The project also requires header only library AudioFile.h
+set(AUDIOFILE_DIR "${CMAKE_BINARY_DIR}/_deps/AudioFile")
+if(NOT EXISTS "${AUDIOFILE_DIR}/AudioFile.h")
+   message(STATUS "AudioFile.h not found, cloning the AudioFile repository...")
+   execute_process(
+           COMMAND git clone https://github.com/adamstark/AudioFile.git "${AUDIOFILE_DIR}"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+           RESULT_VARIABLE result
+   )
+   if(NOT result EQUAL "0")
+      message(FATAL_ERROR "Failed to clone the AudioFile repository. Please manually add AudioFile.h")
+   endif()
+endif()
+
+# src
 add_subdirectory(optrode)
 add_subdirectory(filters)
-add_subdirectory(AudioFile)
-add_subdirectory(cnl)
 
-# Output Information
-if(CMAKE_SYSTEM MATCHES Windows)
-   message(STATUS "Target system is Windows")
-endif()
-
-if(CMAKE_HOST_SYSTEM MATCHES Linux)
-   message(STATUS "Build host runs Linux")
-endif()
-
-add_executable(demo main.cpp)
-target_link_libraries(demo PUBLIC ${Boost_LIBRARIES} optrode filters)
-
+# software filter demo
 add_executable(lmsDemo lmsDemo.cpp)
-target_link_libraries(lmsDemo PUBLIC ${Boost_LIBRARIES} gcem filters AudioFile Cnl gsl)
+target_include_directories(lmsDemo PRIVATE "${AUDIOFILE_DIR}")
+target_link_libraries(lmsDemo PUBLIC filters gcem Cnl gsl)
+
+# soc-fpga-dsp-platorm
+add_executable(record main.cpp)
+target_include_directories(record PRIVATE "${AUDIOFILE_DIR}")
+target_link_libraries(record PUBLIC optrode filters)
+
+# data-collection
+add_executable(datacollection datacollection.cpp)
+target_include_directories(datacollection PRIVATE "${AUDIOFILE_DIR}")
+target_link_libraries(datacollection PUBLIC optrode filters)
+
+# dma-test
+add_executable(dmatest dmatest.c)
+target_link_libraries(dmatest PUBLIC)
+
+# axidma test
+add_executable(test test.c)
+target_link_libraries(test PUBLIC)
+
+# xildma
+add_subdirectory(drivers/common)
+target_link_libraries(xildma PRIVATE common)
+add_subdirectory(drivers/axidma)
+target_link_libraries(xildma PRIVATE axidma)
+add_executable(xildma xildma.c)
+target_link_libraries(xildma PUBLIC)

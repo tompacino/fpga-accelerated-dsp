@@ -1,19 +1,21 @@
 #include <iostream>
+#include <ranges>
+#include <cstdint>
 #include <numeric>
 
-#include "AudioFile/AudioFile.h"
-#include "cnl/include/cnl/all.h"
-#include <gsl/gsl_statistics.h>
+#include "AudioFile.h"
+#include "cnl/all.h"
 #include "gcem.hpp"
+#include "gsl/gsl_statistics.h"
 
 #include "filters/lms/lms.h"
 #include "filters/leakyIntegrator.h"
 
+using cnl::neg_inf_rounding_tag;
 using cnl::power;
 using cnl::saturated_overflow_tag;
 using cnl::scaled_integer;
 using cnl::static_integer;
-using cnl::neg_inf_rounding_tag;
 
 using T_VNLMS = float;
 using T_LEAKY = float;
@@ -50,7 +52,8 @@ int main()
     LeakyIntegrator leakyRef = LeakyIntegrator<T_LEAKY>(alphaLeaky, minusalphaLeaky, initLeaky);
     LeakyIntegrator leakyOpt = LeakyIntegrator<T_LEAKY>(alphaLeaky, minusalphaLeaky, initLeaky);
 
-    std::cout << "leaky integrator\n" << leakyRef << "\n";
+    std::cout << "leaky integrator\n"
+              << leakyRef << "\n";
 
     // VSS NLMS
     constexpr float initialStepSizeF = 0.0005F;
@@ -76,7 +79,8 @@ int main()
 
     LMS::VSS myFilter = LMS::VSS<T_VNLMS, filterTaps, true>(initialStepSize, alpha, gamma, epsilon, minStepSize, maxStepSize);
 
-    std::cout << "lms filter\n" << myFilter << "\n";
+    std::cout << "lms filter\n"
+              << myFilter << "\n";
 
     AudioFile<float> ref;
     AudioFile<float> opt;
@@ -121,9 +125,9 @@ int main()
     int channel = 0;
     int numSamples = ref.getNumSamplesPerChannel() - lookahead;
 
-    double* optCor = new double[numSamples];
-    double* refCor = new double[numSamples];
-    double* ancCor = new double[numSamples];
+    double *optCor = new double[numSamples];
+    double *refCor = new double[numSamples];
+    double *ancCor = new double[numSamples];
 
     for (std::size_t idxOpt = 0; idxOpt < numSamples; idxOpt++)
     {
@@ -177,16 +181,18 @@ int main()
     stp.save("temp/stp.wav");
     anc.save("temp/anc.wav");
 
-    std::cout << "Pearson correlation OPT & ANC:\n" << gsl_stats_correlation(optCor, 1, ancCor, 1, numSamples) << "\n";
+    std::cout << "Pearson correlation OPT & ANC:\n"
+              << gsl_stats_correlation(optCor, 1, ancCor, 1, numSamples) << "\n";
 
-    std::cout << "Pearson correlation REF & ANC:\n" << gsl_stats_correlation(refCor, 1, ancCor, 1, numSamples) << "\n";
+    std::cout << "Pearson correlation REF & ANC:\n"
+              << gsl_stats_correlation(refCor, 1, ancCor, 1, numSamples) << "\n";
 
-    std::cout << "Pearson correlation OPT & REF:\n" << gsl_stats_correlation(optCor, 1, refCor, 1, numSamples) << "\n";
+    std::cout << "Pearson correlation OPT & REF:\n"
+              << gsl_stats_correlation(optCor, 1, refCor, 1, numSamples) << "\n";
 
-    delete [] optCor;
-    delete [] refCor;
-    delete [] ancCor;
+    delete[] optCor;
+    delete[] refCor;
+    delete[] ancCor;
 
     return 0;
 }
-

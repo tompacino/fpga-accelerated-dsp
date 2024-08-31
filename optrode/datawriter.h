@@ -9,6 +9,7 @@ enum class WriterStatus
 class DataWriter
 {
     WriterStatus status;
+
 public:
-    DataWriter(){};
+    DataWriter();
 };

@@ -71,9 +71,9 @@ void handler(int signal)
 template <typename T>
 void initialiseAudioFile(AudioFile<T> &af, typename AudioFile<T>::AudioBuffer &ab, Recording &r)
 {
-    af.setNumChannels(TOTAL_CHANNELS);
-    af.setSampleRate(SAMPLE_RATE);
-    af.setBitDepth(BIT_DEPTH);
+    af.setNumChannels(TOTAL_CHANNELS_DATACOLLECTION);
+    af.setSampleRate(SPS_DATACOLLECTION);
+    af.setBitDepth(BIT_DEPTH_DATACOLLECTION);
 
     af.setAudioBuffer(ab);
     af.save(r.filename(), AudioFileFormat::Wave);
@@ -82,12 +82,41 @@ void initialiseAudioFile(AudioFile<T> &af, typename AudioFile<T>::AudioBuffer &a
         << "init audiofile " << r.filename();
 }
 
-int main()
-{
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        BOOST_LOG_TRIVIAL(error) << "Usage: " << argv[0] << " <wav_file_name>";
+        return 1;
+    }
+
+    std::string wavFileName = argv[1];
+    std::ifstream file(wavFileName);
+    if (!file.good()) {
+        BOOST_LOG_TRIVIAL(error) << "File does not exist or cannot be opened.";
+        return 2;
+    }
+
+    AudioFile<int32_t> inputFile;
+    if (!inputFile.load(wavFileName)) {
+        BOOST_LOG_TRIVIAL(error) << "Unable to load the WAV file.";
+        return 3;
+    }
+
+    if (inputFile.getBitDepth() != BIT_DEPTH_DATACOLLECTION) {
+        BOOST_LOG_TRIVIAL(error) << "Bit depth is not " << BIT_DEPTH << " bits.";
+        return 4;
+    }
+
+    if (inputFile.getSampleRate() < SPS_DATACOLLECTION) {
+        BOOST_LOG_TRIVIAL(error) << "Sample rate is less than " << SPS_DATACOLLECTION << " Hz.";
+        return 5;
+    }
+
+    BOOST_LOG_TRIVIAL(info) << "WAV file loaded successfully and meets requirements.";
+
     std::ostringstream logStream;
-    logStream << "\n\toptrode:                      soc-fpga-dsp-platform"
+    logStream << "\n\tdatacollection:               " << wavFileName
               << "\n\tinit serial device            " << SERIAL_DEVICE
-              << "\n\ttotal_channels                " << TOTAL_CHANNELS
+              << "\n\ttotal_channels                " << TOTAL_CHANNELS_DATACOLLECTION
               << "\n\tmem_bytes                     " << MEM_BYTES
               << "\n\tbytes_per_sample              " << BYTES_PER_SAMPLE
               << "\n\tsamples_per_file              " << SAMPLES_PER_FILE
@@ -101,25 +130,33 @@ int main()
     std::tm now_tm = *std::localtime(&time);
     std::ostringstream oss;
     oss << std::put_time(&now_tm, "%Y-%m-%d_%H-%M-%S");
-    std::string name = FILENAME_ANC + '_' + oss.str();
+    std::string name = FILENAME_DATACOLLECTION + '_' + oss.str();
 
     Recording r(name, BYTES_PER_SAMPLE, SAMPLES_PER_FILE);
 
     // prep audio buffer
-    constexpr std::size_t BUFFER_LENGTH = SAMPLE_RATE;
-    AudioFile<uint32_t>::AudioBuffer audioBuffer;
-    audioBuffer.resize(TOTAL_CHANNELS);
+    constexpr std::size_t BUFFER_LENGTH = SPS_DATACOLLECTION * BUFFER_SAVE_SECONDS_DATACOLLECTION;
+    std::size_t currentChannel = 0;
+    AudioFile<int32_t>::AudioBuffer audioBuffer;
+    audioBuffer.resize(TOTAL_CHANNELS_DATACOLLECTION);
     std::ranges::for_each(audioBuffer, [&BUFFER_LENGTH](auto &b)
                           { b.reserve(BUFFER_LENGTH); });
 
     // prep audio file
-    AudioFile<uint32_t> audioFile;
+    AudioFile<int32_t> audioFile;
     initialiseAudioFile(audioFile, audioBuffer, r);
 
     BOOST_LOG_TRIVIAL(info) << r.to_str();
     std::signal(SIGINT, handler);
 
-    while (!recordingStopSignal)
+    uint64_t inputIdx = 0;
+    uint64_t inputFileNumSamples = inputFile.getNumSamplesPerChannel();
+    BOOST_LOG_TRIVIAL(info) << "inputFileNumSamples " << inputFileNumSamples;
+    inputFileNumSamples = (inputFileNumSamples % 2 == 0) ? inputFileNumSamples : inputFileNumSamples - 1;
+    BOOST_LOG_TRIVIAL(info) << "inputFileNumSamples updated to " << inputFileNumSamples;
+    fpga.dma.sendData(inputFile.samples[0], inputIdx);
+    inputIdx += 2;
+    while (inputIdx < inputFileNumSamples && !recordingStopSignal)
     {
         if (fpga.dma.status == Status::ERROR)
         {
@@ -148,7 +185,7 @@ int main()
             audioFile.save(r.filename(), AudioFileFormat::Wave);
 
             // increase buffer size
-            size_t newBufferSize = audioBuffer[0].capacity() + SAMPLE_RATE;
+            size_t newBufferSize = audioBuffer[0].capacity() + (SPS_DATACOLLECTION * BUFFER_SAVE_SECONDS_DATACOLLECTION);
             BOOST_LOG_TRIVIAL(debug)
                 << "increase audio file buffer size from "
                 << audioBuffer[0].capacity()
@@ -160,24 +197,23 @@ int main()
 
         // record sample packet
         int bytesRecorded = fpga.dma.fillBuffer();
-        volatile int audioBufferLength = audioBuffer[0].size();
-        // BOOST_LOG_TRIVIAL(debug) << "recorded " << bytesRecorded << " bytes";
-        if (bytesRecorded > 0)
+
+        //volatile int audioBufferLength = audioBuffer[0].size();
+        auto sampleIt = fpga.dma.buffer.begin();
+        while (sampleIt != fpga.dma.buffer.end())
         {
-            audioBuffer[0].insert(audioBuffer[0].end(), std::make_move_iterator(fpga.dma.buffer.begin()), std::make_move_iterator(fpga.dma.buffer.end()));
-            // BOOST_LOG_TRIVIAL(debug) << "stored " << bytesRecorded << " bytes";
-
-            // std::cout << "AUDIO BUFFER STATE:\n";
-            // std::ranges::for_each(audioBuffer[0], [](const auto &elem)
-            //                       { std::cout << std::hex << elem << std::dec << " "; });
-            // std::cout << "\n";
-            fpga.dma.buffer.clear();
-            r.recordedSamples += bytesRecorded / BYTES_PER_SAMPLE;
+            // BOOST_LOG_TRIVIAL(info) << "got sample " << *sampleIt;
+            audioBuffer[currentChannel].push_back(*sampleIt);
+            sampleIt++;
+            r.recordedSamples++;
+            currentChannel = (currentChannel == TOTAL_CHANNELS_DATACOLLECTION - 1) ? 0 : currentChannel + 1;
         }
+        fpga.dma.buffer.clear();
 
-        // transfer more data
-        // BOOST_LOG_TRIVIAL(debug) << "spoofed " << transfer_size_bytes << " bytes";
-        fpga.dma.spoofData(transfer_size_bytes);
+        // transfer audio
+        // BOOST_LOG_TRIVIAL(info) << "sent samples " << inputFile.samples[0][inputIdx] << " " << inputFile.samples[0][inputIdx + 1];
+        fpga.dma.sendData(inputFile.samples[0], inputIdx);
+        inputIdx += 2;
     }
     // save file
     if (r.recordedSamples != 0)
@@ -186,6 +222,8 @@ int main()
             << "save audiofile " << r.filename();
         audioFile.save(r.filename(), AudioFileFormat::Wave);
     }
+
+    BOOST_LOG_TRIVIAL(info) << "data collection completed!";
 
     return 0;
 };
