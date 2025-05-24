@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include <cstdint>
 #include <memory>
 
@@ -90,10 +91,14 @@ public:
 
     AxiStreamDma(AxiStreamDmaAddresses addresses);
 
+    int sendData(std::vector<int32_t> &data, uint32_t idx);
     int spoofData(int transfers);
     int fillBuffer();
 
     unsigned int read(volatile unsigned int *virtual_addr, int offset);
     void write(volatile unsigned int *virtual_addr, int offset, unsigned int value);
     void sync(volatile unsigned int *virtual_addr, int status_register);
+
+    void dma_s2mm_status(volatile uint32_t *virtual_addr);
+    void dma_mm2s_status(volatile uint32_t *virtual_addr);
 };

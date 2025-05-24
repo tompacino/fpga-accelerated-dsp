@@ -4,14 +4,17 @@ build**/
 ## PACKAGES
 # Ignore CMake Package Manager and cache
 cmake/
+.cpmcache/
 # Ignore AudioFiles
 AudioFile/
 # Ignore CNL
 cnl/
 
 ## IDE
-.cpmcache/
+.vscode/
+.vscode-ctags
 .idea/
+.docker/
 
 # Ignore Temporary Files
 temp/

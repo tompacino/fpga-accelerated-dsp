@@ -51,18 +51,12 @@ CPMAddPackage(
   GIT_TAG        20211111
   OPTIONS "BUILDLIBS statistics" "NO_AMPL_BINDINGS on" "GSL_DISABLE_TESTS on" "DOCUMENTATION off"
 )
-# CPMAddPackage(
-#   NAME axidma_api
-#   GITHUB_REPOSITORY tompacino/axi-dma
-#   GIT_TAG        master
-# )
 
 message(STATUS "CPM adding required packages...")
 find_package(cnl REQUIRED)
 find_package(fixed_math REQUIRED)
 find_package(gcem REQUIRED)
 find_package(gsl REQUIRED)
-# find_package(axidma_api REQUIRED)
 
 # The project also requires header only library AudioFile.h
 set(AUDIOFILE_DIR "${CMAKE_BINARY_DIR}/_deps/AudioFile")
@@ -98,17 +92,9 @@ target_include_directories(datacollection PRIVATE "${AUDIOFILE_DIR}")
 target_link_libraries(datacollection PUBLIC optrode filters)
 
 # dma-test
-add_executable(dmatest dmatest.c)
+add_executable(dmatest damtest/dmatest.c)
 target_link_libraries(dmatest PUBLIC)
 
 # axidma test
-add_executable(test test.c)
+add_executable(test dmatest/test.c)
 target_link_libraries(test PUBLIC)
-
-# xildma
-add_subdirectory(drivers/common)
-target_link_libraries(xildma PRIVATE common)
-add_subdirectory(drivers/axidma)
-target_link_libraries(xildma PRIVATE axidma)
-add_executable(xildma xildma.c)
-target_link_libraries(xildma PUBLIC)

@@ -8,7 +8,7 @@
 #include "gcem.hpp"
 #include "gsl/gsl_statistics.h"
 
-#include "filters/lms/lms.h"
+#include "filters/lms.h"
 #include "filters/leakyIntegrator.h"
 
 using cnl::neg_inf_rounding_tag;

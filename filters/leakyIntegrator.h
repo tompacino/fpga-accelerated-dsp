@@ -1,3 +1,8 @@
+/* Copyright (C) 2024-2025 Tom Pacino. All rights reserved.
+ *
+ * Contact author for permissions t.pacino@unsw.edu.au
+ */
+
 #pragma once
 
 template<typename T>

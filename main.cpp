@@ -189,13 +189,3 @@ int main()
 
     return 0;
 };
-
-// enum severity_level
-// {
-//     trace,
-//     debug,
-//     info,
-//     warning,
-//     error,
-//     fatal
-// };

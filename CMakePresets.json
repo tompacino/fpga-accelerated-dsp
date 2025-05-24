@@ -9,7 +9,7 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_CXX_FLAGS_INIT": "-W-Wall -Wextra -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wpointer-arith -Wdangling-else -Wrestrict -Wdouble-promotion -Wvla -Wswitch-enum -Wswitch-defaul -Winvalid-pch -Wodr -Wstack-usage=1024 -Wpedantic -g"
+                "CMAKE_CXX_FLAGS_INIT": "-Wall -Wextra -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wpointer-arith -Wdangling-else -Wrestrict -Wdouble-promotion -Wvla -Wswitch-enum -Wswitch-default -Winvalid-pch -Wodr -Wstack-usage=1024 -Wpedantic -g"
             }
         },
         {
@@ -19,7 +19,7 @@
             "generator": "Unix Makefiles",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_CXX_FLAGS_INIT": "-Wall -Wextra -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wpointer-arith -Wdangling-else -Wrestrict -Wdouble-promotion -Wvla -Wswitch-enum -Wswitch-defaul -Winvalid-pch -Wodr -Wstack-usage=1024 -Wpedantic -fkeep-inline-functions -Og"
+                "CMAKE_CXX_FLAGS_INIT": "-Wall -Wextra -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wpointer-arith -Wdangling-else -Wrestrict -Wdouble-promotion -Wvla -Wswitch-enum -Wswitch-default -Winvalid-pch -Wodr -Wstack-usage=1024 -Wpedantic -fkeep-inline-functions -Og"
             }
         }
     ],
